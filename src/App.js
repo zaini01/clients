@@ -4,70 +4,64 @@ import queryString from "query-string";
 function App() {
   const [code, setCode] = useState("");
   const [user, setUser] = useState({});
+  const [token, setToken] = useState({});
   const [loading, setLoading] = useState(false);
 
   const client_id = "RSK";
-  const host = "http://10.10.2.82";
-  let receiver = document.getElementById("receiver").contentWindow;
+  // const host = "http://10.10.2.82";
+  const host = "http://localhost:8000";
 
   useEffect(() => {
-    setLoading(true);
     setUser({});
     setCode(queryString.parse(window.location.search).code);
     if (code) {
       exchangeCode(code);
-    } else {
-      //get data
-      receiver.postMessage(
-        JSON.stringify({ key: "storage", method: "get" }),
-        "*"
-      );
     }
   }, [code]);
-
-  window.onmessage = function (e) {
-    if (e.origin !== "https://zaini01.github.io") {
-      return;
-    }
-
-    let access_token;
-
-    if (e.data === "not allowed") {
-      setLoading(false);
-    } else if (e.data) {
-      access_token = JSON.parse(e.data).access_token;
-    } else {
-      setLoading(false);
-    }
-
-    if (access_token) {
-      fetch(`${host}/checkSSO`, {
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-        body: JSON.stringify({ access_token: access_token }),
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          setUser({ data });
-          setLoading(false);
-        })
-        .catch((err) => {
-          setLoading(false);
-          console.log(err);
-        });
-    } else {
-      setLoading(false);
-    }
-  };
 
   const logIn = async (e) => {
     e.preventDefault();
     let redirect_url = window.location.href;
+
+    if (redirect_url.includes("?code=")) {
+      let arr = redirect_url.split("?code=");
+      redirect_url = arr[0];
+    }
+    console.log(redirect_url);
+
     let url = `${host}/?client_id=${client_id}&redirect_url=${redirect_url}`;
+
     window.location.href = url;
+  };
+
+  const logout = async (e) => {
+    e.preventDefault();
+
+    let body = {
+      access_token: token.access_token,
+      refresh_token: token.refresh_token,
+      client_id: client_id,
+    };
+
+    fetch(`${host}/signOut`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      body: JSON.stringify(body),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setLoading(false);
+        setUser({ data });
+      })
+      .catch((err) => {
+        setLoading(false);
+        if (err === "SyntaxError: Unexpected token i in JSON at position 0") {
+          alert("invalid code");
+        }
+      });
   };
 
   const exchangeCode = async (code) => {
@@ -88,6 +82,7 @@ function App() {
       .then((data) => {
         localStorage.tokenSSO = JSON.stringify(data);
         token = JSON.parse(localStorage.tokenSSO);
+        setToken(token);
         let body = {
           access_token: token.access_token,
         };
@@ -105,12 +100,6 @@ function App() {
       .then((response) => response.json())
       .then((data) => {
         setLoading(false);
-        // save obj in subdomain localStorage
-        receiver.postMessage(
-          JSON.stringify({ key: "storage", method: "set", data: token }),
-          "*"
-        );
-        setLoading(false);
         setUser({ data });
       })
       .catch((err) => {
@@ -124,8 +113,19 @@ function App() {
   if (user.data) {
     if (user.data.name) {
       return (
-        <div className="d-flex justify-content-center pt-5">
-          <h1>WELCOME {user.data.name.toString().toUpperCase()}</h1>
+        <div>
+          <div className="d-flex justify-content-center pt-5">
+            <h1>WELCOME {user.data.name.toString().toUpperCase()}</h1>
+          </div>
+          <div className="d-flex justify-content-center pt-5">
+            <button
+              type="submit"
+              className="btn-lg btn-primary"
+              onClick={logout}
+            >
+              logout
+            </button>
+          </div>
         </div>
       );
     }
