@@ -8,7 +8,6 @@ function App() {
   const [loading, setLoading] = useState(false);
 
   const client_id = "RSK";
-  // const host = "http://10.10.2.82";
   const host = "http://localhost:8000";
 
   useEffect(() => {
